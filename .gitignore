@@ -10,6 +10,7 @@
 *.lib
 *.dylib
 mnist/
+data/
 caffe/
 grasp/
 images/
@@ -17,6 +18,7 @@ opencv/
 convnet/
 decaf/
 submission/
+cfg/
 build/darknet/*
 build_*/
 !build/darknet/YoloWrapper.cs
@@ -54,8 +56,3 @@ uselib
 uselib_track
 darknet
 cmake-build-debug/*
-/cfg/fire_dev.cfg
-/cfg/fire_dev.data
-/cfg/fire_dev.ini
-/cfg/fire_dev.names
-/cfg/fire_dev_416.cfg
