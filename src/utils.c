@@ -298,6 +298,37 @@ void replace_image_to_label(const char* input_path, char* output_path)
     }
 }
 
+void replace_image_to_result(const char *input_path, char *output_path)
+{
+    find_replace(input_path, "/images/train2014/", "/labels/train2014/", output_path);    // COCO
+    find_replace(output_path, "/images/val2014/", "/labels/val2014/", output_path);        // COCO
+    find_replace(output_path, "/JPEGImages/", "/labels/", output_path);    // PascalVOC
+    find_replace(output_path, "\\images\\train2014\\", "\\labels\\train2014\\", output_path);    // COCO
+    find_replace(output_path, "\\images\\val2014\\", "\\labels\\val2014\\", output_path);        // COCO
+    find_replace(output_path, "\\JPEGImages\\", "\\labels\\", output_path);    // PascalVOC
+    //find_replace(output_path, "/images/", "/labels/", output_path);    // COCO
+    //find_replace(output_path, "/VOC2007/JPEGImages/", "/VOC2007/labels/", output_path);        // PascalVOC
+    //find_replace(output_path, "/VOC2012/JPEGImages/", "/VOC2012/labels/", output_path);        // PascalVOC
+
+    //find_replace(output_path, "/raw/", "/labels/", output_path);
+    trim(output_path);
+
+    // replace only ext of files
+    find_replace_extension(output_path, ".jpg", ".result", output_path);
+    find_replace_extension(output_path, ".JPG", ".result", output_path); // error
+    find_replace_extension(output_path, ".jpeg", ".result", output_path);
+    find_replace_extension(output_path, ".JPEG", ".result", output_path);
+    find_replace_extension(output_path, ".png", ".result", output_path);
+    find_replace_extension(output_path, ".PNG", ".result", output_path);
+    find_replace_extension(output_path, ".bmp", ".result", output_path);
+    find_replace_extension(output_path, ".BMP", ".result", output_path);
+    find_replace_extension(output_path, ".ppm", ".result", output_path);
+    find_replace_extension(output_path, ".PPM", ".result", output_path);
+    find_replace_extension(output_path, ".tiff", ".result", output_path);
+    find_replace_extension(output_path, ".TIFF", ".result", output_path);
+}
+
+
 float sec(clock_t clocks)
 {
     return (float)clocks/CLOCKS_PER_SEC;

@@ -8,6 +8,8 @@
 #include "box.h"
 #include "demo.h"
 #include "option_list.h"
+#include <sys/stat.h>
+#include <dirent.h>
 
 #ifndef __COMPAR_FN_T
 #define __COMPAR_FN_T
@@ -25,6 +27,7 @@ static int coco_ids[] = { 1,2,3,4,5,6,7,8,9,10,11,13,14,15,16,17,18,19,20,21,22,
 
 void train_detector(char *datacfg, char *cfgfile, char *weightfile, int *gpus, int ngpus, int clear, int dont_show, int calc_map, int mjpeg_port, int show_imgs, int benchmark_layers, char* chart_path)
 {
+    float min_loss = -1;
     list *options = read_data_cfg(datacfg);
     char *train_images = option_find_str(options, "train", "data/train.txt");
     char *valid_images = option_find_str(options, "valid", train_images);
@@ -365,6 +368,21 @@ void train_detector(char *datacfg, char *cfgfile, char *weightfile, int *gpus, i
             sprintf(buff, "%s/%s_%d.weights", backup_directory, base, iteration);
             save_weights(net, buff);
         }
+
+        if (-1 == min_loss) {
+            min_loss = loss;
+        }
+        if (min_loss > loss && iteration > (net.burn_in + net.restart_batch)) {
+            min_loss = loss;
+            printf("find minimum loss batch:%d ",iteration);
+#ifdef GPU
+            if (ngpus != 1) sync_nets(nets, ngpus, 0);
+#endif
+            char buff[256];
+            sprintf(buff, "%s/%s_%d.weights", backup_directory, base, iteration);
+            save_weights(net, buff);
+        }
+
 
         if (iteration >= (iter_save_last + 100) || (iteration % 100 == 0 && iteration > 1)) {
             iter_save_last = iteration;
@@ -1865,6 +1883,237 @@ void draw_object(char *datacfg, char *cfgfile, char *weightfile, char *filename,
 }
 #endif // defined(OPENCV) && defined(GPU)
 
+list *get_image_names(char *path) {
+    printf("deal image path: %s\n", path);
+    DIR *d;
+    struct dirent *dir;
+    d = opendir(path);
+    list *imgs = make_list();
+    if (d) {
+        while ((dir = readdir(d)) != NULL) {
+            if (0 == strcmp(dir->d_name, ".") || 0 == strcmp(dir->d_name, "..")) continue;
+            char *dot = strrchr(dir->d_name, '.');
+            //TODO: now only support jpg,later transform PNG to jpg
+            if (dot && !strcasecmp(dot, ".jpg")) {
+                list_insert(imgs,copy_string(dir->d_name));
+//                printf("%s\n", dir->d_name);
+            }
+        }
+        closedir(d);
+    }
+    return imgs;
+}
+
+char *create_result_dir(char *base_path){
+    struct stat st = {0};
+    if ( !(stat(base_path, &st) == 0  &&  (S_ISDIR(st.st_mode))) ){
+        printf("%s is not a dictory!\n", base_path);
+        exit(EXIT_FAILURE);
+    }
+
+    char target_path[256]={0};
+    strcat(target_path,base_path);
+    strcat(target_path,"/result/");
+    printf("target path:%s\n", target_path);
+
+    if (stat(target_path, &st) == 0) {
+        printf("Directory %s exist! You'd better delete or move it by hand. \n",target_path);
+//        exit(EXIT_FAILURE);
+    } else {
+        mkdir(target_path, 0700);
+    }
+
+    char *result=(char*) malloc(strlen(target_path)+1);
+    strcpy(result,target_path);
+    return result;
+}
+
+void batch_test_detector(char *datacfg, char *cfgfile, char *weightfile, char *img_dir_path, float thresh,
+                         float hier_thresh, int dont_show, int ext_output, int save_labels, char *outfile, int letter_box, int benchmark_layers, int save_result, int only_label) {
+    // TODO: check img_dir_path
+    list *img_names = get_image_names(img_dir_path);
+    char *target_path;
+    if(!only_label){
+        target_path = create_result_dir(img_dir_path);
+    }
+
+
+    list *options = read_data_cfg(datacfg);
+    char *name_list = option_find_str(options, "names", "data/names.list");
+    int names_size = 0;
+    char **names = get_labels_custom(name_list, &names_size); //get_labels(name_list);
+
+    image **alphabet = load_alphabet();
+    network net = parse_network_cfg_custom(cfgfile, 1, 1); // set batch=1
+    if (weightfile) {
+        load_weights(&net, weightfile);
+    }
+    net.benchmark_layers = benchmark_layers;
+    fuse_conv_batchnorm(net);
+    calculate_binary_weights(net);
+    if (net.layers[net.n - 1].classes != names_size) {
+        printf("\n Error: in the file %s number of names %d that isn't equal to classes=%d in the file %s \n",
+               name_list, names_size, net.layers[net.n - 1].classes, cfgfile);
+        if (net.layers[net.n - 1].classes > names_size) getchar();
+    }
+    srand(2222222);
+    char buff[256];
+    char *input = buff;
+    char *json_buf = NULL;
+    int json_image_id = 0;
+    FILE* json_file = NULL;
+    if (outfile) {
+        json_file = fopen(outfile, "wb");
+        if(!json_file) {
+            error("fopen failed");
+        }
+        char *tmp = "[\n";
+        fwrite(tmp, sizeof(char), strlen(tmp), json_file);
+    }
+    int j;
+    float nms = .45;    // 0.4F
+
+    node *n = img_names->front;
+    while (n) {
+//        printf("img_path:%s\n", n->val);
+        char img_path[256]={0};
+        strcat(img_path,img_dir_path);
+        strcat(img_path,"/");
+        strcat(img_path,n->val);
+        char result_img[256]={0};
+        if(!only_label){
+            strcat(result_img,target_path);
+            strcat(result_img, n->val);
+            strcat(result_img, ".yolo");
+        }
+        n = n->next;
+        image im = load_image(img_path, 0, 0, net.c);
+        image sized;
+        if(letter_box) sized = letterbox_image(im, net.w, net.h);
+        else sized = resize_image(im, net.w, net.h);
+        layer l = net.layers[net.n - 1];
+
+        //box *boxes = calloc(l.w*l.h*l.n, sizeof(box));
+        //float **probs = calloc(l.w*l.h*l.n, sizeof(float*));
+        //for(j = 0; j < l.w*l.h*l.n; ++j) probs[j] = (float*)xcalloc(l.classes, sizeof(float));
+
+        float *X = sized.data;
+
+        //time= what_time_is_it_now();
+        double time = get_time_point();
+        network_predict(net, X);
+        //network_predict_image(&net, im); letterbox = 1;
+        printf("%s: Predicted in %lf milli-seconds.\n", img_path, ((double) get_time_point() - time) / 1000);
+        //printf("%s: Predicted in %f seconds.\n", input, (what_time_is_it_now()-time));
+
+        int nboxes = 0;
+        detection *dets = get_network_boxes(&net, im.w, im.h, thresh, hier_thresh, 0, 1, &nboxes, letter_box);
+        if (nms) {
+            if (l.nms_kind == DEFAULT_NMS) do_nms_sort(dets, nboxes, l.classes, nms);
+            else diounms_sort(dets, nboxes, l.classes, nms, l.nms_kind, l.beta_nms);
+        }
+        if (!only_label){
+            draw_detections_v3(im, dets, nboxes, thresh, names, alphabet, l.classes, ext_output);
+            save_image(im, result_img);
+        }
+
+        if (json_file) {
+            if (json_buf) {
+                char *tmp = ", \n";
+                fwrite(tmp, sizeof(char), strlen(tmp), json_file);
+            }
+            ++json_image_id;
+            json_buf = detection_to_json(dets, nboxes, l.classes, names, json_image_id, input);
+
+            fwrite(json_buf, sizeof(char), strlen(json_buf), json_file);
+            free(json_buf);
+        }
+
+        // pseudo labeling concept - fast.ai
+        if (save_labels)
+        {
+            char labelpath[4096];
+            replace_image_to_label(img_path, labelpath);
+
+            FILE *fw = fopen(labelpath, "wb");
+            int i;
+            for (i = 0; i < nboxes; ++i) {
+                char buff[1024];
+                int class_id = -1;
+                float prob = 0;
+                for (j = 0; j < l.classes; ++j) {
+                    if (dets[i].prob[j] > thresh && dets[i].prob[j] > prob) {
+                        prob = dets[i].prob[j];
+                        class_id = j;
+                    }
+                }
+                if (class_id >= 0) {
+                    sprintf(buff, "%d %2.4f %2.4f %2.4f %2.4f\n", class_id, dets[i].bbox.x, dets[i].bbox.y, dets[i].bbox.w, dets[i].bbox.h);
+                    fwrite(buff, sizeof(char), strlen(buff), fw);
+                }
+            }
+            fclose(fw);
+        }
+
+        if (save_result) {
+            char labelpath[4096];
+            replace_image_to_result(img_path, labelpath);
+
+            FILE *fw = fopen(labelpath, "wb");
+            int i;
+            for (i = 0; i < nboxes; ++i) {
+                char buff[1024];
+                int class_id = -1;
+                float prob = 0;
+                for (j = 0; j < l.classes; ++j) {
+                    if (dets[i].prob[j] > thresh && dets[i].prob[j] > prob) {
+                        prob = dets[i].prob[j];
+                        class_id = j;
+                    }
+                }
+                if (class_id >= 0) {
+                    sprintf(buff, "%d %2.4f %2.4f %2.4f %2.4f %2.4f\n", class_id, dets[i].bbox.x, dets[i].bbox.y,
+                            dets[i].bbox.w, dets[i].bbox.h, prob);
+                    fwrite(buff, sizeof(char), strlen(buff), fw);
+                }
+            }
+            fclose(fw);
+        }
+
+        free_detections(dets, nboxes);
+        free_image(im);
+        free_image(sized);
+    }
+
+    if (json_file) {
+        char *tmp = "\n]";
+        fwrite(tmp, sizeof(char), strlen(tmp), json_file);
+        fclose(json_file);
+    }
+
+    // free memory
+    free_ptrs((void**)names, net.layers[net.n - 1].classes);
+    free_list_contents_kvp(options);
+    free_list(options);
+    free_list(img_names);
+
+    int i;
+    const int nsize = 8;
+    for (j = 0; j < nsize; ++j) {
+        for (i = 32; i < 127; ++i) {
+            free_image(alphabet[j][i]);
+        }
+        free(alphabet[j]);
+    }
+    free(alphabet);
+
+    free_network(net);
+}
+
+
+
+
+
 void run_detector(int argc, char **argv)
 {
     int dont_show = find_arg(argc, argv, "-dont_show");
@@ -1897,6 +2146,8 @@ void run_detector(int argc, char **argv)
     // and for recall mode (extended output table-like format with results for best_class fit)
     int ext_output = find_arg(argc, argv, "-ext_output");
     int save_labels = find_arg(argc, argv, "-save_labels");
+    int save_result = find_arg(argc, argv, "-save_result");
+    int only_label = find_arg(argc, argv, "-only_label");
     char* chart_path = find_char_arg(argc, argv, "-chart", 0);
     if (argc < 4) {
         fprintf(stderr, "usage: %s %s [train/test/valid/demo/map] [data] [cfg] [weights (optional)]\n", argv[0], argv[1]);
@@ -1936,6 +2187,7 @@ void run_detector(int argc, char **argv)
             if (weights[strlen(weights) - 1] == 0x0d) weights[strlen(weights) - 1] = 0;
     char *filename = (argc > 6) ? argv[6] : 0;
     if (0 == strcmp(argv[2], "test")) test_detector(datacfg, cfg, weights, filename, thresh, hier_thresh, dont_show, ext_output, save_labels, outfile, letter_box, benchmark_layers);
+    else if (0 == strcmp(argv[2], "batchTest")) batch_test_detector(datacfg, cfg, weights, filename, thresh, hier_thresh, dont_show, ext_output, save_labels, outfile, letter_box, benchmark_layers, save_result, only_label);
     else if (0 == strcmp(argv[2], "train")) train_detector(datacfg, cfg, weights, gpus, ngpus, clear, dont_show, calc_map, mjpeg_port, show_imgs, benchmark_layers, chart_path);
     else if (0 == strcmp(argv[2], "valid")) validate_detector(datacfg, cfg, weights, outfile);
     else if (0 == strcmp(argv[2], "recall")) validate_detector_recall(datacfg, cfg, weights);
