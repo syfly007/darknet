@@ -16,13 +16,16 @@ extern "C" {
 #endif
 /*
 typedef enum {
-    CONSTANT, STEP, EXP, POLY, STEPS, SIG, RANDOM
+    CONSTANT, STEP, EXP, POLY, STEPS, SIG, RANDOM, COS
 } learning_rate_policy;
 
 typedef struct network{
     float *workspace;
     int n;
     int batch;
+    int restart_batch;
+    int cos_cycle;
+    int cos_multi;
 	uint64_t *seen;
     float epoch;
     int subdivisions;

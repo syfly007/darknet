@@ -3,6 +3,7 @@
 #include <stdio.h>
 #include <time.h>
 #include <assert.h>
+#include <math.h>
 
 #include "network.h"
 #include "image.h"
@@ -102,6 +103,32 @@ void reset_rnn(network *net)
     reset_network_state(net, 0);
 }
 
+float compute_cos(int batch, int cycle, int multi)
+{
+    double PI = 3.14159265358979323846;
+    if (multi == 1) {
+        return cos((1./2)*PI*abs(batch % cycle)/cycle);
+    }
+    int MAX = 50;
+    int n = floor(batch/cycle);
+    int i = 0;
+    int sum = 0;
+    int accum = 0;
+    int curr_cycle = cycle;
+    double p = 0.;
+    while (i < MAX){
+        p = pow(multi,i);
+        sum += p;
+        if(n < sum){
+            accum = (sum - p) * cycle;
+            curr_cycle = (int)pow(multi,i)*cycle;
+            break;
+        }
+        i++;
+    }
+    return cos((1./2)*PI*(abs((batch - accum)%curr_cycle))/curr_cycle);
+}
+
 float get_current_seq_subdivisions(network net)
 {
     int sequence_subdivisions = net.init_sequential_subdivisions;
@@ -130,7 +157,11 @@ int get_sequence_value(network net)
 
 float get_current_rate(network net)
 {
-    int batch_num = get_current_batch(net);
+    int batch_num = get_current_batch(net) - net.restart_batch;
+    if ( batch_num < 0 ) {
+        printf("restart_batch is greater than current batch num in cfg file \n");
+        exit(EXIT_FAILURE);
+    }
     int i;
     float rate;
     if (batch_num < net.burn_in) return net.learning_rate * pow((float)batch_num / net.burn_in, net.power);
@@ -157,6 +188,9 @@ float get_current_rate(network net)
             return net.learning_rate * pow(rand_uniform(0,1), net.power);
         case SIG:
             return net.learning_rate * (1./(1.+exp(net.gamma*(batch_num - net.step))));
+        case COS:
+            batch_num = batch_num - net.burn_in;
+            return net.learning_rate * compute_cos(batch_num, net.cos_cycle, net.cos_multi);
         case SGDR:
         {
             int last_iteration_start = 0;
