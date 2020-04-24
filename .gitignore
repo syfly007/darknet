@@ -56,4 +56,3 @@ uselib
 uselib_track
 darknet
 cmake-build-debug/*
-/cfg/
