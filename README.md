@@ -20,9 +20,7 @@
 
 2. #### 结果图片输出概率
 
-   <img src="./data/result.jpg" height="200" alt="图片名称" align=center>
-
-   
+   <img src="./data/result.jpg" height="200" alt="图片名称" align=left>
 
 3. #### 余弦退火算法
 
@@ -38,9 +36,9 @@
 
    学习率效果图
 
-   <img src="./data/cos.png" height="200" alt="图片名称" align=center>
+   <img src="./data/cos.png" height="200" alt="图片名称" align=left>
 
-   []()
+   
 
 4. 重新训练，保留之前的批次号
 
