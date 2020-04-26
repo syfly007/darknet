@@ -1,4 +1,63 @@
 # Yolo-v4 and Yolo-v3/v2 for Windows and Linux
+
+### 在AlexeyAB版darknet上做了点优化，增加了一些实用功能：
+
+1. #### 批量测试图片
+
+   测试/path/of/images/路径下的所有图片，并输出结果图片到/path/of/images/results下
+
+   `./darknet detector batchTest coco.data coco.cfg coco.weights /path/of/images/ -thresh 0.25`
+
+   可选参数
+
+   -only_label :只输出yolo结果文件，不输出结果图片
+
+   `./darknet detector batchTest coco.data coco.cfg coco.weights /path/of/images/ -only_label -thresh 0.25`
+
+   -save_result :输出.result格式的结果文件，其实就是在yolo格式结果文件中增加了类的预测概率
+
+   `./darknet detector batchTest coco.data coco.cfg coco.weights /path/of/images/ -save_result -thresh 0.25`
+
+2. #### 结果图片输出概率
+
+   <img src="./data/result.jpg" height="200" alt="图片名称" align=left>
+
+3. #### 余弦退火算法
+
+   AlexeyAB版后来也实现了sgdr，没做比较
+
+   cfg文件中，policy设置为cos，新增cos_cycle、cos_multi，指定余弦的周期和倍数
+
+   ```
+   cos_cycle=1000
+   cos_multi=2
+   policy=cos
+   ```
+
+   学习率效果图
+
+   <img src="./data/cos.png" height="200" alt="图片名称" align=left>
+
+   
+
+4. 重新训练，保留之前的批次号
+
+   cfg文件中新增restart_batch选项，指定从哪个批次开始训练，默认是0
+
+   ```
+   restart_batch=125664
+   ```
+
+   然后训练
+
+   `./darknet detector train coco.data coco.cfg coco_125664.weights -gpus 2,3 -dont_show`
+
+   注意：
+
+   （1）权重文件仍需要在训练命令中手工指定，不会自动根据批次号获取。
+
+   （2）重新训练前后，使用gpu的数量不能变，否则批次号会错乱。
+
 ### (neural network for object detection) - Tensor Cores can be used on [Linux](https://github.com/AlexeyAB/darknet#how-to-compile-on-linux) and [Windows](https://github.com/AlexeyAB/darknet#how-to-compile-on-windows-using-cmake-gui)
 
 Paper Yolo v4: https://arxiv.org/abs/2004.10934
