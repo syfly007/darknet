@@ -20,7 +20,7 @@
 
 2. #### 结果图片输出概率
 
-   <img src="./data/result.jpg" height="200" alt="图片名称" align=left>
+   <img src="./data/result.jpg" height="200" alt="图片名称" align=center>
 
    
 
@@ -38,7 +38,7 @@
 
    学习率效果图
 
-   <img src="./data/cos.png" height="200" alt="图片名称" align=left>
+   <img src="./data/cos.png" height="200" alt="图片名称" align=center>
 
    []()
 
