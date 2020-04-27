@@ -4,7 +4,7 @@
 
 1. #### 批量测试图片
 
-   测试/path/of/images/路径下的所有图片，并输出结果图片到/path/of/images/results下
+   测试/path/of/images/路径下的所有图片，并输出结果图片到/path/of/images/result下
 
    `./darknet detector batchTest coco.data coco.cfg coco.weights /path/of/images/ -thresh 0.25`
 
