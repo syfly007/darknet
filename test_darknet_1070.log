@@ -1,0 +1,37 @@
+30223      C   ./darknet                                   1479MiB
+
+process num: 8
+all time: 193758 ms
+process image num: 8384
+avg predicted time: 23.11 ms
+process 346.16 images per second
+
+process num: 16
+all time: 568913 ms
+process image num: 16768
+avg predicted time: 33.92 ms
+process 471.68 images per second
+
+process num: 24
+all time: 1274609 ms
+process image num: 25152
+avg predicted time: 50.67 ms
+process 473.52 images per second
+
+process num: 32
+all time: 2323973 ms
+process image num: 33536
+avg predicted time: 69.29 ms
+process 461.76 images per second
+
+process num: 40
+all time: 3607136 ms
+process image num: 41920
+avg predicted time: 86.04 ms
+process 464.80 images per second
+
+process num: 40
+all time: 2918537 ms
+process image num: 41920
+avg predicted time: 69.62 ms
+process 574.40 images per second

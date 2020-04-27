@@ -62,6 +62,47 @@
 
    （2）重新训练前后，使用gpu的数量不能变，否则批次号会错乱。
 
+5. #### 测试检测速度
+
+  用于测试多模型、多gpu场景下，darknet的并发识别速度
+  
+  （1）修改test_gpu.sh，配置gpu_num、per_gpu_num，指定使用gpu数量、每个gpu加载模型数量
+  
+  ```
+  gpu_num=8
+  per_gpu_num=4
+  ```
+  
+  （2） 执行test_gpu.sh开始测试
+  
+  ```
+  bash test_gpu.sh
+  ```
+  
+  （3）执行test_statistics.sh统计检测结果
+  
+  ```
+  bash test_statistics.sh
+  ```
+  
+  生成的统计结果如下：
+  
+  ```
+  30223      C   ./darknet                                   1479MiB
+  
+  process num: 8
+  all time: 193758 ms
+  process image num: 8384
+  avg predicted time: 23.11 ms
+  process 346.16 images per second
+  
+  process num: 16
+  all time: 568913 ms
+  process image num: 16768
+  avg predicted time: 33.92 ms
+  process 471.68 images per second
+  ```
+
 ### (neural network for object detection) - Tensor Cores can be used on [Linux](https://github.com/AlexeyAB/darknet#how-to-compile-on-linux) and [Windows](https://github.com/AlexeyAB/darknet#how-to-compile-on-windows-using-cmake-gui)
 
 Paper Yolo v4: https://arxiv.org/abs/2004.10934

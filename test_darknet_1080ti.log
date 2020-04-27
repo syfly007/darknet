@@ -1,0 +1,35 @@
+process num: 8
+all time: 110593 ms
+process image num: 7680
+avg predicted time: 14.40 ms
+process 555.52 images per second
+
+process num: 16
+all time: 284794 ms
+process image num: 15360
+avg predicted time: 18.54 ms
+process 862.88 images per second
+
+process num: 24
+all time: 494374 ms
+process image num: 23040
+avg predicted time: 21.45 ms
+process 1118.88 images per second
+
+process num: 32
+all time: 769152 ms
+process image num: 30720
+avg predicted time: 25.03 ms
+process 1278.40 images per second
+
+process num: 48
+all time: 1417825 ms
+process image num: 46080
+avg predicted time: 30.76 ms
+process 1560.00 images per second
+
+process num: 56
+all time: 1766973 ms
+process image num: 53760
+avg predicted time: 32.86 ms
+process 1704.08 images per second
